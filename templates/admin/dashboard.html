@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель{% endblock %}
+
+{% block content %}
+<style>
+/* Общий контейнер */
+.container-admin {
+    padding: 1rem;
+    padding-bottom: 6rem; /* чтобы таббар не перекрывал нижние элементы */
+}
+
+/* Карточки */
+.card-admin {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* Заголовки */
+.card-admin h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Формы */
+.form-control, .form-select {
+    font-size: 0.9rem;
+    height: 40px;
+    border-radius: 10px;
+}
+
+/* Единый стиль кнопок */
+.btn {
+    font-size: 0.9rem;
+    height: 42px;
+    min-height: 42px;
+    padding: 0 0.9rem;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    line-height: 1;
+}
+
+.btn-sm {
+    font-size: 0.85rem;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 0.6rem;
+    border-radius: 8px;
+}
+
+/* Модалки */
+.modal-content {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.modal-header {
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.modal-footer {
+    border-top: 1px solid #e5e7eb;
+    padding: 0.75rem;
+}
+
+.modal-footer .btn {
+    height: 36px;
+    min-height: 36px;
+    font-size: 0.85rem;
+}
+
+/* Таблицы */
+.table td, .table th {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.6rem;
+    vertical-align: middle;
+}
+
+.table th {
+    background: #f8fafc;
+}
+
+/* Заказы */
+.order-card {
+    background: white;
+    border-radius: 12px;
+    padding: 0.9rem;
+    margin-bottom: 0.9rem;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+
+.order-card ul {
+    margin-bottom: 0.6rem;
+}
+
+.order-actions .btn {
+    font-size: 0.8rem;
+    height: 34px;
+    padding: 0 0.6rem;
+    border-radius: 8px;
+}
+
+/* Иконки */
+.btn i {
+    font-size: 0.95em;
+}
+
+/* На больших экранах */
+@media (min-width: 768px) {
+    .btn { height: 44px; font-size: 0.95rem; padding: 0 1rem; }
+    .btn-sm { height: 38px; font-size: 0.9rem; padding: 0 0.7rem; }
+}
+</style>
+
+<div class="container-admin">
+    <div class="text-center mb-3">
+        <h1 class="fw-bold text-secondary">Админ-панель</h1>
+        <p class="text-muted mb-0">Управление магазином</p>
+    </div>
+
+    <!-- Добавление пользователя -->
+    <div class="card-admin">
+        <h5><i class="fas fa-user-plus"></i> Добавить пользователя</h5>
+        <form method="POST" action="{{ url_for('add_user') }}" class="row g-2">
+            <div class="col-12 col-md-4">
+                <input type="text" class="form-control" name="username" placeholder="Логин" required>
+            </div>
+            <div class="col-12 col-md-4">
+                <input type="password" class="form-control" name="password" placeholder="Пароль" required>
+            </div>
+            <div class="col-12 col-md-2">
+                <select class="form-select" name="role">
+                    <option value="user">Пользователь</option>
+                    <option value="admin">Админ</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-outline-primary w-100">Добавить</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Пользователи -->
+    <div class="card-admin">
+        <h5><i class="fas fa-users"></i> Пользователи</h5>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Логин</th>
+                        <th>Роль</th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>
+                            <span class="badge {% if user.role == 'admin' %}bg-secondary{% else %}bg-light text-dark{% endif %}">
+                                {{ user.role }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#editUser{{ user.id }}">
+                                Изменить
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Модалки редактирования пользователей -->
+    {% for user in users %}
+    <div class="modal fade" id="editUser{{ user.id }}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title">Изменить пользователя</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('edit_user', user_id=user.id) }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Логин</label>
+                            <input type="text" class="form-control" name="username" value="{{ user.username }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Новый пароль</label>
+                            <input type="password" class="form-control" name="password" placeholder="Оставьте пустым">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Добавление товара -->
+    <div class="card-admin">
+        <h5><i class="fas fa-box"></i> Добавить товар</h5>
+        <form method="POST" action="{{ url_for('add_product') }}" enctype="multipart/form-data" class="row g-2">
+            <div class="col-12 col-md-4">
+                <input type="text" class="form-control" name="name" placeholder="Название" required>
+            </div>
+            <div class="col-12 col-md-3">
+                <input type="number" step="0.01" class="form-control" name="price" placeholder="Цена" required>
+            </div>
+            <div class="col-12 col-md-3">
+                <input type="file" class="form-control" name="image" accept="image/*">
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-outline-success w-100">Добавить</button>
+            </div>
+        </form>
+
+        <a href="{{ url_for('admin_products') }}" class="btn btn-outline-secondary mb-3">
+             <i class="fas fa-box"></i> Управление товарами
+        </a>
+
+    </div>
+
+
+   <!-- 🔹 Заказы -->
+<div class="card-admin">
+    <h5><i class="fas fa-list me-2"></i>Заказы</h5>
+    {% if orders %}
+        {% for order in orders %}
+        <div class="order-card">
+            <div class="d-flex justify-content-between mb-1">
+                <div><strong>Заказ #{{ order.id }}</strong> — {{ order.user.username }}</div>
+                <small class="text-muted">{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+            </div>
+
+            <ul class="list-unstyled small mb-2">
+                {% for item in order.items %}
+                <li>
+                    <i class="fas fa-box text-secondary me-1"></i>
+                    {{ item.product.name }} × {{ item.quantity }}
+                    — <span class="text-success">{{ item.product.price * item.quantity }} UZS</span>
+                </li>
+                {% endfor %}
+            </ul>
+
+            <div class="d-flex justify-content-between align-items-center order-actions flex-wrap gap-2">
+                {% set total = namespace(value=0) %}
+                {% for item in order.items %}
+                    {% set total.value = total.value + (item.product.price * item.quantity) %}
+                {% endfor %}
+                <span class="fw-bold text-dark">Итого: {{ total.value }} UZS</span>
+                <div class="d-flex gap-2">
+                    {% if order.status == 'pending' %}
+                        <a href="{{ url_for('update_order', order_id=order.id, status='confirmed') }}" 
+                           class="btn btn-sm btn-outline-success d-flex align-items-center">
+                            <i class="fas fa-check me-1"></i> Подтвердить
+                        </a>
+                        <a href="{{ url_for('update_order', order_id=order.id, status='cancelled') }}" 
+                           class="btn btn-sm btn-outline-danger d-flex align-items-center">
+                            <i class="fas fa-times me-1"></i> Отменить
+                        </a>
+                    {% elif order.status == 'confirmed' %}
+                        <span class="badge bg-success d-flex align-items-center">
+                            <i class="fas fa-check-circle me-1"></i> Подтвержден
+                        </span>
+                        <a href="{{ url_for('print_order', order_id=order.id) }}" 
+                           target="_blank" 
+                           class="btn btn-sm btn-dark d-flex align-items-center">
+                            <i class="fas fa-print me-1"></i> Печать
+                        </a>
+                    {% elif order.status == 'cancelled' %}
+                        <span class="badge bg-danger d-flex align-items-center">
+                            <i class="fas fa-ban me-1"></i> Отменен
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="text-center text-muted py-5">
+        <i class="fas fa-inbox fa-3x mb-3"></i>
+        <p>Заказов пока нет</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card-admin">
+    <h5><i class="fas fa-image"></i> Баннеры</h5>
+
+    <form action="{{ url_for('add_banner') }}" method="POST" enctype="multipart/form-data" class="d-flex gap-2 mb-3">
+        <input type="file" name="banner" accept="image/*" class="form-control" required>
+        <button type="submit" class="btn btn-outline-primary">Добавить баннер</button>
+    </form>
+
+    <div class="row g-3">
+        {% for banner in banners %}
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm">
+                <img src="{{ url_for('static', filename='banners/' ~ banner.filename) }}" class="card-img-top" alt="Баннер">
+                <div class="card-body text-center p-2">
+                    <form action="{{ url_for('delete_banner', banner_id=banner.id) }}" method="POST">
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">Удалить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted text-center">Баннеров пока нет</p>
+        {% endfor %}
+    </div>
+</div>
+
+
+
+    </div>
+</div>
+{% endblock %}

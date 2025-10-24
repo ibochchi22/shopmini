@@ -1,0 +1,441 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}Интернет-магазин{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#007bff">
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+
+    
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #4f46e5;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1e293b;
+            --gray: #94a3b8;
+            --light: #f8fafc;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f6fa;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Верхний navbar */
+        .navbar-top {
+            background-color: #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 0.75rem 0;
+            min-height: auto !important;
+        }
+
+        .navbar-top .container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary) !important;
+            letter-spacing: 0.5px;
+            font-size: 1.2rem;
+        }
+
+        .nav-link {
+            color: var(--dark) !important;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--primary) !important;
+        }
+
+        .container {
+            padding-top: 1rem;
+            padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+        }
+
+        /* Карточки */
+        .card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Кнопки */
+        .btn {
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+        }
+
+        .btn-success {
+            background: var(--success);
+            border: none;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            border: none;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            border: none;
+            color: white;
+        }
+
+        /* Бейджи */
+        .badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        /* Формы */
+        .form-control, .form-select {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.7rem 1rem;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* Модальные окна */
+        .modal-content {
+            border-radius: 12px;
+            border: none;
+        }
+
+        .modal-header {
+            background: var(--light);
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        /* Заголовки */
+        h1, h2, h3, h4, h5 {
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        /* Таблицы */
+        .table {
+            background: white;
+        }
+
+        .table thead {
+            background: var(--light);
+            color: var(--dark);
+        }
+
+        .table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Алерты */
+        .alert {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Иконка корзины */
+        .cart-icon {
+            position: relative;
+        }
+
+        .cart-count {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            background: var(--danger);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        /* Нижний таббар */
+        .mobile-tabbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #ffffff;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            display: none;
+            justify-content: space-around;
+            padding: 0.75rem 0;
+            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+            z-index: 999;
+        }
+
+        .mobile-tabbar a {
+            color: #6c757d;
+            text-decoration: none;
+            text-align: center;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .mobile-tabbar a:active {
+            transform: scale(0.9);
+        }
+
+        .mobile-tabbar a.active {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .mobile-tabbar i {
+            font-size: 1.4rem;
+        }
+
+        .tabbar-badge {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.75rem;
+            background: var(--danger);
+            color: white;
+            border-radius: 50%;
+            min-width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+
+        /* Анимации */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.4s ease forwards;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .navbar-toggler {
+                display: none !important;
+            }
+
+            .navbar-collapse {
+                display: none !important;
+            }
+
+            .navbar-brand {
+                margin: 0 auto;
+                font-size: 1.1rem;
+            }
+
+            .navbar-top {
+                padding: 0.5rem 0;
+                min-height: 56px !important;
+            }
+
+            .navbar-top .navbar-brand {
+                padding: 0.5rem 0;
+            }
+
+            .mobile-tabbar {
+                display: flex;
+            }
+
+            .container {
+                padding-top: 0.5rem;
+                padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+            }
+        }
+
+        @media (min-width: 769px) {
+            .mobile-tabbar {
+                display: none !important;
+            }
+
+            .container {
+                padding-bottom: 2rem;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 0;
+            background: transparent;
+        }
+    </style>
+</head>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('{{ url_for("static", filename="service-worker.js") }}')
+      .then(reg => console.log('✅ Service Worker зарегистрирован:', reg))
+      .catch(err => console.log('❌ Ошибка SW:', err));
+  });
+}
+</script>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-shopping-bag"></i> Shop
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if session.user_id %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('index') }}">
+                                <i class="fas fa-home"></i> Главная
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link cart-icon" href="{{ url_for('cart') }}">
+                                <i class="fas fa-shopping-cart"></i> Корзина
+                                {% if session.get('cart') and session.cart|length > 0 %}
+                                <span class="cart-count">{{ session.cart|length }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('profile') }}">
+                                <i class="fas fa-user"></i> Профиль
+                            </a>
+                        </li>
+                        {% if session.role == 'admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                                <i class="fas fa-cog"></i> Админ
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt"></i> Выход
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}">Вход</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn btn-primary text-white ms-2" href="{{ url_for('register') }}">
+                                Регистрация
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+   <!-- Нижний таббар (только для авторизованных пользователей на мобильных) -->
+{% if session.user_id %}
+<nav class="mobile-tabbar">
+    <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+        <i class="fas fa-home"></i>
+        <span>Главная</span>
+    </a>
+
+    <a href="{{ url_for('cart') }}" class="{% if request.endpoint == 'cart' %}active{% endif %}">
+        <i class="fas fa-shopping-cart"></i>
+        <span>Корзина</span>
+        {% if session.get('cart') and session.cart|length > 0 %}
+        <span class="tabbar-badge">{{ session.cart|length }}</span>
+        {% endif %}
+    </a>
+
+    <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}">
+        <i class="fas fa-user"></i>
+        <span>Профиль</span>
+    </a>
+
+    {% if session.role == 'admin' %}
+    <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+        <i class="fas fa-cog"></i>
+        <span>Админ</span>
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
