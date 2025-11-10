@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h3 class="mb-4">⚙️ Настройки системы</h3>
+
+    <form method="POST" class="card p-4 shadow-sm">
+        <div class="mb-3">
+            <label for="kurs" class="form-label"><b>💰 Курс (UZS)</b></label>
+            <input type="number" step="0.01" name="kurs" id="kurs" class="form-control" value="{{ kurs }}">
+            <div class="form-text text-muted">Укажите курс для пересчета цен.</div>
+        </div>
+
+        <div class="mb-3 mt-3">
+            <label for="izoh" class="form-label"><b>📝 Izoh (текст на чеке)</b></label>
+            <textarea name="izoh" id="izoh" rows="4" class="form-control">{{ izoh }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success px-4">💾 Сохранить</button>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Назад</a>
+    </form>
+</div>
+{% endblock %}

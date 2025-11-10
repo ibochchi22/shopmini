@@ -15,6 +15,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 import os
 from reportlab.lib.pagesizes import A5
 from reportlab.lib.units import mm
+from datetime import datetime, timedelta
 
 
 app = Flask(__name__)
@@ -29,6 +30,7 @@ db = SQLAlchemy(app)
 # Создаем папку для загрузок
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+
 # Модели базы данных
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -36,6 +38,8 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='user')
     orders = db.relationship('Order', backref='user', lazy=True)
+    last_active = db.Column(db.DateTime, default=datetime.utcnow)  # ✅ Новое поле
+
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,6 +55,7 @@ class Order(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='pending')
+    kurs = db.Column(db.Float, nullable=False, default=12200.0)
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
 
 class OrderItem(db.Model):
@@ -62,6 +67,44 @@ class OrderItem(db.Model):
 class Banner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
+
+class Setting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False)
+    value = db.Column(db.Text, nullable=True)
+
+
+
+
+# ==============================
+# 🔧 Вспомогательные функции
+# ==============================
+
+def get_kurs():
+    kurs_setting = Setting.query.filter_by(key='kurs').first()
+    try:
+        return float(kurs_setting.value)
+    except:
+        return 12200.0  # курс по умолчанию
+
+
+def round_price(value):
+    """Округляем до ближайших 100 сум для красивых цен."""
+    return round(value / 100) * 100
+
+
+# Далее уже идут твои маршруты Flask
+# Например:
+# @app.route('/')
+# def index():
+#     ...
+
+
+
+def round_price(value):
+    """Округляем до ближайших 100 сум для красивых цен."""
+    return round(value / 100) * 100
+
 
 
 # Инициализация базы данных
@@ -99,12 +142,19 @@ def admin_required(f):
 # Главная страница
 @app.route('/')
 def index():
-    # Проверка: если пользователь не вошёл
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    banners = Banner.query.all() 
+
+    kurs = get_kurs()
+    banners = Banner.query.all()
     products = Product.query.all()
+
+    # Пересчитываем цену по курсу
+    for p in products:
+        p.price = round_price(p.price * kurs)
+
     return render_template('index.html', products=products, banners=banners)
+
 
 # Регистрация
 @app.route('/register', methods=['GET', 'POST'])
@@ -154,26 +204,28 @@ def logout():
     flash('Вы вышли из системы', 'info')
     return redirect(url_for('index'))
 
-# Корзина
 @app.route('/cart')
 @login_required
 def cart():
+    kurs = get_kurs()
     cart_items = session.get('cart', {})
     products = []
     total = 0
-    
+
     for product_id, quantity in cart_items.items():
         product = Product.query.get(int(product_id))
         if product:
-            products.append({'product': product, 'quantity': quantity})
-            total += product.price * quantity
-    
+            price_uzs = round_price(product.price * kurs)
+            products.append({'product': product, 'quantity': quantity, 'price_uzs': price_uzs})
+            total += price_uzs * quantity
+
     return render_template('cart.html', products=products, total=total)
+
 
 @app.route('/admin/banners')
 def admin_banners():
     banners = Banner.query.all()
-    return render_template('admin_dashboard', banners=banners)
+    return render_template('admin/banners.html', banners=banners)
 
 # ===== Добавление баннера =====
 @app.route('/admin/add_banner', methods=['POST'])
@@ -238,7 +290,7 @@ def checkout():
         flash('Корзина пуста', 'warning')
         return redirect(url_for('cart'))
     
-    order = Order(user_id=session['user_id'])
+    order = Order(user_id=session['user_id'], kurs=get_kurs())
     db.session.add(order)
     db.session.flush()
     
@@ -263,11 +315,21 @@ def profile():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    users = User.query.all()
-    products = Product.query.all()
-    orders = Order.query.order_by(Order.created_at.desc()).all()
-    banners = Banner.query.all()
-    return render_template('admin/dashboard.html', users=users, products=products, orders=orders, banners=banners)
+    total_users = User.query.count()
+    total_products = Product.query.count()
+    total_orders = Order.query.count()
+
+    # Пример — онлайн пользователи за последние 5 минут
+    online_users = User.query.filter(User.last_active >= datetime.utcnow() - timedelta(minutes=5)).count()
+
+    return render_template(
+        'admin/dashboard.html',
+        total_users=total_users,
+        total_products=total_products,
+        total_orders=total_orders,
+        online_users=online_users
+    )
+
 
 # Добавить пользователя
 @app.route('/admin/add_user', methods=['POST'])
@@ -349,156 +411,229 @@ def update_order(order_id, status):
         flash('Статус заказа обновлен', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# Печать заказов в PDF
-# --------------------------
-# 1️⃣ HTML чек с диалогом печати
-# --------------------------
 @app.route('/admin/print_order/<int:order_id>')
 @admin_required
 def print_order(order_id):
-    from flask import render_template_string
-    from datetime import datetime
-
     order = Order.query.get_or_404(order_id)
-    total = sum(item.product.price * item.quantity for item in order.items)
+
+    # курс и округление
+    kurs = order.kurs or get_kurs()
+
+    # рассчитываем общую сумму с округлением
+    total = 0
+    items_data = []
+    for item in order.items:
+        price_uzs = round_price(item.product.price * kurs)
+        summa = round_price(price_uzs * item.quantity)
+        total += summa
+        items_data.append({
+            'name': item.product.name,
+            'quantity': item.quantity,
+            'price': price_uzs,
+            'summa': summa
+        })
+
+    # izoh
+    izoh_setting = Setting.query.filter_by(key='izoh').first()
+    izoh = izoh_setting.value if izoh_setting else "Yukingizni tekshirib oling, 3 kundan so‘ng javob berilmaydi!"
 
     html_template = """
     <!DOCTYPE html>
-    <html lang="ru">
+    <html lang="uz">
     <head>
         <meta charset="UTF-8">
-        <title>Номенклатура заказа №{{ order.id }}</title>
+        <title>Chek №{{ order.id }}</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
         <style>
-            @page {
-                size: A5 portrait;
-                margin: 8mm;
-            }
+            @page { size: A5 portrait; margin: 8mm; }
 
             body {
                 font-family: "DejaVu Sans", sans-serif;
-                color: #000;
+                font-size: 11px;
+                color: #111;
+                background: #f9fafb;
                 margin: 0;
                 padding: 0;
-                font-size: 11px;
-                line-height: 1.3;
             }
 
-            .document {
+            .container {
                 width: 100%;
-                padding: 5px 10px;
+                background: #fff;
+                box-shadow: 0 0 6px rgba(0,0,0,0.1);
+                border-radius: 6px;
+                padding: 12px 16px;
                 box-sizing: border-box;
             }
 
-            h2 {
+            .header {
                 text-align: center;
+                font-weight: 800;
                 font-size: 14px;
-                margin-bottom: 6px;
-                border-bottom: 1px solid #000;
-                padding-bottom: 3px;
+                color: #1e293b;
+                margin-bottom: 2px;
+                letter-spacing: 0.3px;
+            }
+
+            .sub-header {
+                text-align: center;
+                font-size: 10.5px;
+                color: #6b7280;
+                margin-bottom: 8px;
+            }
+
+            .divider {
+                border-bottom: 1px dashed #d1d5db;
+                margin: 8px 0;
             }
 
             .info {
-                margin-top: 5px;
-                margin-bottom: 10px;
                 font-size: 11px;
-                line-height: 1.4;
+                line-height: 1.5;
+                margin-bottom: 6px;
+                color: #111827;
+            }
+
+            .info i {
+                color: #2563eb;
+                width: 14px;
+                text-align: center;
+                margin-right: 4px;
             }
 
             table {
                 width: 100%;
                 border-collapse: collapse;
-                border: 1px solid #000;
                 margin-top: 5px;
-            }
-
-            th, td {
-                border: 1px solid #000;
-                padding: 3px 4px;
-                text-align: center;
                 font-size: 10.5px;
             }
 
+            th, td {
+                border: 1px solid #e5e7eb;
+                padding: 4px 3px;
+                text-align: center;
+            }
+
             th {
-                background: #f4f4f4;
-                font-size: 11px;
+                background: #f3f4f6;
+                font-weight: 700;
+                color: #1e293b;
             }
 
             td:nth-child(2) {
                 text-align: left;
             }
 
-            tfoot td {
-                font-weight: bold;
+            .total {
+                margin-top: 10px;
                 text-align: right;
+                font-weight: bold;
+                border-top: 1px solid #9ca3af;
+                padding-top: 6px;
+                font-size: 11.5px;
+            }
+
+            .total i {
+                color: #16a34a;
+                margin-right: 4px;
             }
 
             .footer {
-                margin-top: 12px;
-                text-align: right;
+                margin-top: 10px;
                 font-size: 10.5px;
-                border-top: 1px dashed #000;
+                border-top: 1px dashed #ccc;
                 padding-top: 6px;
+                line-height: 1.4;
+                color: #111827;
+            }
+
+            .footer i {
+                color: #2563eb;
+                margin-right: 4px;
+            }
+
+            .note {
+                margin-top: 6px;
+                text-align: center;
+                font-size: 9.8px;
+                color: #555;
             }
 
             @media print {
-                body {
-                    margin: 0;
-                }
-                .document {
-                    width: 100%;
-                    padding: 0;
-                }
+                body { background: #fff; }
+                .container { box-shadow: none; border-radius: 0; }
             }
         </style>
     </head>
     <body onload="window.print()">
-        <div class="document">
-            <h2>НОМЕНКЛАТУРА ЗАКАЗА №{{ order.id }}</h2>
+        <div class="container">
+            <div class="header"><i class="fa-solid fa-store text-primary"></i> Строй Март 0111</div>
+            <div class="sub-header">
+                <i class="fa-solid fa-phone"></i> +998 88 202 0111 &nbsp;&nbsp; 
+                <i class="fa-solid fa-coins"></i> Kurs: {{ "{:,.0f}".format(kurs) }}
+            </div>
+
+            <div class="divider"></div>
 
             <div class="info">
-                <b>Дата:</b> {{ order.created_at.strftime('%d.%m.%Y %H:%M') }}<br>
-                <b>Клиент:</b> {{ order.user.username }}
+                <p><i class="fa-solid fa-user"></i> <b>Mijoz:</b> {{ order.user.username }}</p>
+                <p><i class="fa-solid fa-receipt"></i> <b>Chek №:</b> {{ order.id }}</p>
+                <p><i class="fa-solid fa-calendar-days"></i> <b>Sana:</b> {{ order.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</p>
             </div>
 
             <table>
                 <thead>
                     <tr>
                         <th>№</th>
-                        <th>Наименование</th>
-                        <th>Кол-во</th>
-                        <th>Цена</th>
-                        <th>Сумма</th>
+                        <th>Mahsulot nomi</th>
+                        <th>Miqdor</th>
+                        <th>Birlik</th>
+                        <th>Narx</th>
+                        <th>Summa</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in order.items %}
+                    {% for item in items %}
                     <tr>
                         <td>{{ loop.index }}</td>
-                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.name }}</td>
                         <td>{{ item.quantity }}</td>
-                        <td>{{ "{:,.0f}".format(item.product.price) }} UZS</td>
-                        <td>{{ "{:,.0f}".format(item.product.price * item.quantity) }} UZS</td>
+                        <td>Дона</td>
+                        <td>{{ "{:,.0f}".format(item.price) }}</td>
+                        <td>{{ "{:,.0f}".format(item.summa) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="4">ИТОГО:</td>
-                        <td>{{ "{:,.0f}".format(total) }} UZS</td>
-                    </tr>
-                </tfoot>
             </table>
 
+            <div class="total">
+                <i class="fa-solid fa-wallet"></i> Jami: {{ "{:,.0f}".format(total) }} UZS<br>
+                <i class="fa-solid fa-money-bill-wave"></i> To‘lov: {{ "{:,.0f}".format(total) }} UZS
+            </div>
+
             <div class="footer">
-                Подпись продавца: _______________________<br><br>
-                Спасибо за покупку!
+                <p><i class="fa-solid fa-pen-to-square"></i> <b>Izoh:</b> {{ izoh }}</p>
+                <p><i class="fa-solid fa-mobile-screen"></i> Buyurtma mobil ilovadan yuborilgan</p>
+            </div>
+
+            <div class="note">
+                <i class="fa-solid fa-heart text-danger"></i> Rahmat xaridingiz uchun!
             </div>
         </div>
     </body>
     </html>
     """
 
-    return render_template_string(html_template, order=order, total=total)
+    return render_template_string(
+        html_template,
+        order=order,
+        total=total,
+        izoh=izoh,
+        items=items_data,
+        kurs=kurs
+    )
+
+
+
 
 
 # --------------------------
@@ -630,7 +765,87 @@ def unarchive_product(product_id):
 
 
 
+# ====== Настройки админ-панели (Izoh + Kurs) ======
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    izoh_setting = Setting.query.filter_by(key='izoh').first()
+    kurs_setting = Setting.query.filter_by(key='kurs').first()
+
+    if request.method == 'POST':
+        new_izoh = request.form.get('izoh', '').strip()
+        new_kurs = request.form.get('kurs', '').strip()
+
+        # Izoh
+        if izoh_setting:
+            izoh_setting.value = new_izoh
+        else:
+            db.session.add(Setting(key='izoh', value=new_izoh))
+
+        # Kurs
+        try:
+            kurs_value = float(new_kurs.replace(',', '.'))
+        except:
+            kurs_value = 12200.0  # значение по умолчанию
+        if kurs_setting:
+            kurs_setting.value = str(kurs_value)
+        else:
+            db.session.add(Setting(key='kurs', value=str(kurs_value)))
+
+        db.session.commit()
+        flash('Настройки успешно обновлены!', 'success')
+        return redirect(url_for('admin_settings'))
+
+    izoh = izoh_setting.value if izoh_setting else "Yukingizni tekshirib oling, 3 kundan so‘ng javob berilmaydi!"
+    kurs = kurs_setting.value if kurs_setting else "12200"
+
+    return render_template('admin/settings.html', izoh=izoh, kurs=kurs)
+
+
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    users = User.query.all()
+    return render_template('admin/users.html', users=users)
+
+
+@app.route('/admin/orders')
+@admin_required
+def admin_orders():
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    kurs = get_kurs()  # 🔹 получаем курс из базы
+    return render_template('admin/orders.html', orders=orders, kurs=kurs)
+
+
+@app.before_request
+def update_last_active():
+    # Не выполняем для статических/файлов, health-check или когда нет user_id
+    if 'user_id' not in session:
+        return
+
+    # Игнорируем, если это запрос к статике
+    if request.endpoint and request.endpoint.startswith('static'):
+        return
+
+    try:
+        user = User.query.get(session['user_id'])
+        if not user:
+            return
+        now = datetime.utcnow()
+        # Обновляем only если прошло >30 секунд (чтобы не писать постоянно)
+        if not user.last_active or (now - user.last_active).total_seconds() > 30:
+            user.last_active = now
+            db.session.commit()
+    except Exception:
+        # на случай проблем с БД — не ломаем страницу
+        db.session.rollback()
+
+
+
 
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0',debug=True, port=8080)
+
+

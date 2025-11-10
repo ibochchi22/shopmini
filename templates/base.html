@@ -406,36 +406,146 @@ if ('serviceWorker' in navigator) {
     </div>
 
    <!-- Нижний таббар (только для авторизованных пользователей на мобильных) -->
+<!-- 🔹 Нижний таббар -->
 {% if session.user_id %}
+
+{% if session.role == 'admin' %}
+<!-- 🛠 Таббар администратора -->
 <nav class="mobile-tabbar">
-    <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
-        <i class="fas fa-home"></i>
-        <span>Главная</span>
-    </a>
+  <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+    <i class="fas fa-home"></i>
+    <span>Главная</span>
+  </a>
 
-    <a href="{{ url_for('cart') }}" class="{% if request.endpoint == 'cart' %}active{% endif %}">
-        <i class="fas fa-shopping-cart"></i>
-        <span>Корзина</span>
-        {% if session.get('cart') and session.cart|length > 0 %}
-        <span class="tabbar-badge">{{ session.cart|length }}</span>
-        {% endif %}
-    </a>
+  <a href="{{ url_for('admin_products') }}" class="{% if request.endpoint == 'admin_products' %}active{% endif %}">
+    <i class="fas fa-boxes"></i>
+    <span>Товары</span>
+  </a>
 
-    <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}">
-        <i class="fas fa-user"></i>
-        <span>Профиль</span>
-    </a>
+  <a href="{{ url_for('admin_orders') }}" class="{% if request.endpoint == 'admin_orders' %}active{% endif %}">
+    <i class="fas fa-list"></i>
+    <span>Заказы</span>
+  </a>
 
-    {% if session.role == 'admin' %}
-    <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
-        <i class="fas fa-cog"></i>
-        <span>Админ</span>
-    </a>
+  <a href="{{ url_for('admin_settings') }}" class="{% if request.endpoint == 'admin_settings' %}active{% endif %}">
+    <i class="fas fa-sliders-h"></i>
+    <span>Настройки</span>
+  </a>
+
+  <a href="{{ url_for('admin_banners') }}" class="{% if request.endpoint == 'admin_banners' %}active{% endif %}">
+    <i class="fas fa-image"></i>
+    <span>Баннеры</span>
+  </a>
+</nav>
+
+{% else %}
+<!-- 🛍 Таббар обычного пользователя -->
+<nav class="mobile-tabbar">
+  <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+    <i class="fas fa-home"></i>
+    <span>Главная</span>
+  </a>
+
+  <a href="{{ url_for('cart') }}" class="{% if request.endpoint == 'cart' %}active{% endif %}">
+    <i class="fas fa-shopping-cart"></i>
+    <span>Корзина</span>
+    {% if session.get('cart') and session.cart|length > 0 %}
+    <span class="tabbar-badge">{{ session.cart|length }}</span>
     {% endif %}
+  </a>
+
+  <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}">
+    <i class="fas fa-user"></i>
+    <span>Профиль</span>
+  </a>
 </nav>
 {% endif %}
 
+{% endif %}
+
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+
+function fixTabbarOnKeyboard() {
+  const tabbar = document.querySelector('.mobile-tabbar');
+  if (!tabbar) return;
+
+  // Функция для фиксации таббара
+  function adjust() {
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement && (
+      activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      activeElement.isContentEditable
+    );
+
+    if (isInputFocused) {
+      // Когда открыта клавиатура — скрываем таббар
+      tabbar.style.transform = 'translateY(100%)';
+    } else {
+      // Возвращаем на место
+      tabbar.style.transform = 'translateY(0)';
+    }
+  }
+
+  // События для мобильных браузеров
+  window.visualViewport?.addEventListener('resize', adjust);
+  document.addEventListener('focusin', adjust);
+  document.addEventListener('focusout', adjust);
+}
+
+window.addEventListener('load', fixTabbarOnKeyboard);
+
+
+    </script>
+
+
+<script>
+async function subscribeUserToPush() {
+  if (!('serviceWorker' in navigator)) return;
+  const registration = await navigator.serviceWorker.ready;
+
+  const response = await fetch("/vapid_public_key");
+  const vapidPublicKey = await response.text();
+
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+  });
+
+  await fetch("/save_subscription", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription)
+  });
+
+  console.log("✅ Подписка на уведомления сохранена!");
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+// Спрашиваем разрешение на уведомления
+if (Notification.permission === "default") {
+  Notification.requestPermission().then(permission => {
+    if (permission === "granted") {
+      subscribeUserToPush();
+    }
+  });
+} else if (Notification.permission === "granted") {
+  subscribeUserToPush();
+}
+</script>
+
+
+
 </body>
 </html>

@@ -10,7 +10,8 @@
       <input type="text" name="name" class="form-control" placeholder="Название товара" required>
     </div>
     <div class="col-md-2">
-      <input type="number" name="price" class="form-control" placeholder="Цена" required>
+      <input type="number" name="price" class="form-control" placeholder="Цена" step="0.01" min="0" required>
+
     </div>
     <div class="col-md-3">
       <input type="file" name="image" class="form-control" accept="image/*">
@@ -50,11 +51,11 @@
           
           <div class="card-body text-center">
             <h6 class="product-name">{{ product.name }}</h6>
-            <p class="product-price">{{ product.price }} UZS</p>
+            <p class="product-price">{{ product.price }} $</p>
             
             <form action="{{ url_for('edit_product', product_id=product.id) }}" method="POST" enctype="multipart/form-data" class="mb-2">
               <input type="text" name="name" class="form-control mb-1" placeholder="Новое название">
-              <input type="number" name="price" class="form-control mb-1" placeholder="Новая цена">
+              <input type="number" name="price" class="form-control mb-1" placeholder="Новая цена" step="0.01" min="0">
               <input type="file" name="image" class="form-control mb-2" accept="image/*">
               <button class="btn btn-sm btn-outline-primary w-100">Изменить</button>
             </form>
